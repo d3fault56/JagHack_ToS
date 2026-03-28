@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html { font-family: 'Share Tech Mono', monospace; }
+  * { scrollbar-width: thin; scrollbar-color: #00ff4133 transparent; }
+}
