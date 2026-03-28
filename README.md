@@ -40,7 +40,7 @@ npm run dev
 ```
 chronos-lex/
 ├── backend/
-│   ├── server.js          # Express + Gemini integration
+│   ├── server.py          # Express + Gemini integration
 │   ├── package.json
 │   └── .env               # GEMINI_API_KEY goes here
 ├── frontend/
