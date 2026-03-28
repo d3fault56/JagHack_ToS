@@ -6,11 +6,11 @@ A cyberpunk-themed Terms of Service analyzer powered by Google Gemini. Paste any
 
 ---
 
-## ⚡ Quick Start (Hackathon Mode)
 
-### Prerequisites
+
+### Things to download:
 - Node.js 18+
-- A [Google Gemini API key](https://aistudio.google.com/apikey) (free tier works)
+- A [Google Gemini API key](https://aistudio.google.com/apikey) (paid-tier)
 
 ### 1. Backend Setup
 ```bash
@@ -35,7 +35,7 @@ npm run dev
 
 ---
 
-## 🏗️ Project Structure
+## Project Folder Structure
 
 ```
 chronos-lex/
@@ -56,7 +56,7 @@ chronos-lex/
 
 ---
 
-## 🔑 Environment Variables
+## Environment Variables
 
 Create `backend/.env`:
 ```env
@@ -66,7 +66,7 @@ PORT=3001
 
 ---
 
-## 🧠 Gemini System Prompt: Street-Samurai Persona
+## Gemini System Prompt: Street-Samurai Persona
 
 The AI analyzes text for three threat categories:
 
@@ -89,7 +89,7 @@ The AI analyzes text for three threat categories:
 
 ---
 
-## 🎨 Design System
+## Design System
 
 **Colors:**
 - `#00ff41` — Matrix Green (safe / primary UI)
@@ -102,17 +102,15 @@ The AI analyzes text for three threat categories:
 
 ---
 
-## 🚀 Future: Chrome Extension
+## Future Features: 
 
-1. Add a `manifest.json` (Manifest V3) with `activeTab` permission
-2. Use `chrome.scripting.executeScript` to extract `document.body.innerText`
-3. Send to the same `/api/analyze` endpoint
-4. Render a popup with the Danger Meter and collapsed threat summary
-5. Add a badge icon that turns red when threats > 60 are detected on a page
+1. Add a drag-and-drop feature for user experience
+2. Add a memory storage feature so users can keep track of ToS policies they signed up for. 
+
 
 ---
 
-## 📡 API Reference
+## API Reference
 
 ### `POST /api/analyze`
 ```json
