@@ -129,4 +129,4 @@ The AI analyzes text for three threat categories:
 
 ---
 
-*Built in a 10-hour hackathon sprint. Stay sharp, choomba.*
+
