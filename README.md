@@ -1,14 +1,13 @@
 To# CHRONOS-LEX: The ToS Shredder
 
-> *"In a world where every click is a contract, only the sharpest eyes survive."*
 
-A cyberpunk-themed Terms of Service analyzer powered by Google Gemini. Paste any ToS or Privacy Policy and get a Street-Samurai threat analysis identifying **Identity Harvesting**, **Financial Traps**, and **Neural Privacy** violations — with a 0-100 Danger Score.
+A cyberpunk-themed application that analyzes ToS contracts. Uses Google's API to properly scraper and anlyze the contract and informs users of a danger score.  
 
 ---
 
 
 
-### Things to download:
+### Things to download and setup first:
 - Node.js 18+
 - A [Google Gemini API key](https://aistudio.google.com/apikey) (paid-tier)
 
