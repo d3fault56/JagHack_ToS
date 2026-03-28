@@ -139,7 +139,7 @@ async def analyze(req: AnalyzeRequest):
 
     try:
         model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
+            model_name="gemini-2.5-flash",
             system_instruction=SYSTEM_INSTRUCTION,
             generation_config=genai.GenerationConfig(
                 temperature=0.7,
@@ -171,6 +171,8 @@ async def analyze(req: AnalyzeRequest):
     except ValueError as e:
         raise HTTPException(status_code=500, detail=f"Neural link failure: {e}")
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         msg = str(e)
         if "API_KEY" in msg or "api key" in msg.lower():
             raise HTTPException(status_code=500, detail="Invalid Gemini API key. Check your .env file.")
