@@ -1,6 +1,7 @@
 import os
 import json
 import re
+import uvicorn
 from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException
@@ -8,6 +9,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import google.generativeai as genai
 from dotenv import load_dotenv
+
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
+from pathlib import Path
+import webbrowser
+import threading
+import traceback
 
 load_dotenv()
 
@@ -108,16 +116,74 @@ class AnalyzeResponse(BaseModel):
     verdict: str
 
 
+# ── Helper: safely extract text from Gemini response ─────────────────────────
+def extract_gemini_text(result) -> str:
+    """
+    Safely pull the text out of a Gemini GenerateContentResponse.
+    Handles blocked responses, empty candidates, and thinking-model quirks.
+    """
+    # Check for prompt-level blocks (no candidates at all)
+    if not result.candidates:
+        block_reason = getattr(result.prompt_feedback, "block_reason", "UNKNOWN")
+        raise ValueError(f"Gemini blocked the prompt. Reason: {block_reason}")
+
+    candidate = result.candidates[0]
+
+    # Check finish reason — anything other than STOP or MAX_TOKENS is trouble
+    finish_reason = str(getattr(candidate, "finish_reason", "")).upper()
+    if not any(x in finish_reason for x in ("STOP", "1", "MAX_TOKENS", "2")):
+        raise ValueError(f"Gemini returned unexpected finish_reason: {finish_reason}")
+
+    # Pull text from content parts (works for standard + thinking models)
+    parts = getattr(candidate.content, "parts", [])
+    text_parts = []
+    for part in parts:
+        part_text = getattr(part, "text", None)
+        if part_text:
+            # Skip thinking/reasoning parts (Gemini 2.5 thinking model wraps these)
+            if getattr(part, "thought", False):
+                continue
+            text_parts.append(part_text)
+
+    raw = "".join(text_parts).strip()
+
+    if not raw:
+        raise ValueError("Gemini returned an empty response body.")
+
+    return raw
+
+
 # ── Helper: parse Gemini output safely ───────────────────────────────────────
 def parse_gemini_json(raw: str) -> dict:
     raw = raw.strip()
+
+    # Attempt 1: direct parse
     try:
         return json.loads(raw)
     except json.JSONDecodeError:
-        # Strip markdown fences if Gemini added them
-        cleaned = re.sub(r"^```(?:json)?\n?", "", raw)
-        cleaned = re.sub(r"\n?```$", "", cleaned).strip()
+        pass
+
+    # Attempt 2: strip markdown fences (```json ... ``` or ``` ... ```)
+    cleaned = re.sub(r"^```(?:json)?\s*\n?", "", raw, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\n?\s*```$", "", cleaned).strip()
+    try:
         return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+
+    # Attempt 3: extract the first {...} block via regex (handles leading/trailing junk)
+    match = re.search(r"\{[\s\S]*\}", cleaned)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    # All attempts failed — raise with the raw text for debugging
+    raise json.JSONDecodeError(
+        f"Could not parse JSON from Gemini response. Raw (first 500 chars): {raw[:500]}",
+        raw, 0
+    )
 
 
 # ── Route: POST /api/analyze ──────────────────────────────────────────────────
@@ -145,14 +211,20 @@ async def analyze(req: AnalyzeRequest):
                 temperature=0.7,
                 top_k=40,
                 top_p=0.9,
-                max_output_tokens=2048,
+                max_output_tokens=4096,          # ← bumped from 2048; large docs need room
                 response_mime_type="application/json",
             ),
         )
 
         prompt = f"ANALYZE THIS LEGAL DOCUMENT:\n\n{text}"
-        result = model.generate_content(prompt)
-        raw = result.text
+
+        result = model.generate_content(
+            prompt,
+            request_options={"timeout": 300},
+        )
+
+        # ── Safe text extraction (replaces bare result.text) ──────────────────
+        raw = extract_gemini_text(result)
 
         parsed = parse_gemini_json(raw)
 
@@ -167,11 +239,12 @@ async def analyze(req: AnalyzeRequest):
         return AnalyzeResponse(**parsed)
 
     except json.JSONDecodeError as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Neural link failure: Gemini returned malformed JSON — {e}")
     except ValueError as e:
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Neural link failure: {e}")
     except Exception as e:
-        import traceback
         traceback.print_exc()
         msg = str(e)
         if "API_KEY" in msg or "api key" in msg.lower():
@@ -192,18 +265,21 @@ async def health():
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
 
+# ── Serve React frontend ──────────────────────────────────────────────────────
+STATIC_DIR = Path(__file__).parent / "dist"
+if STATIC_DIR.exists():
+    app.mount("/assets", StaticFiles(directory=STATIC_DIR / "assets"), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_frontend(full_path: str):
+        return FileResponse(STATIC_DIR / "index.html")
+
 
 # ── Dev entrypoint ────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    import uvicorn
-
     port = int(os.getenv("PORT", 3001))
-    print(f"""
-  ╔═══════════════════════════════════════╗
-  ║   CHRONOS-LEX BACKEND — ONLINE        ║
-  ║   Runtime: Python / FastAPI           ║
-  ║   Port: {port}                          ║
-  ║   Gemini: {"ARMED ●" if GEMINI_API_KEY else "MISSING KEY ○"}              ║
-  ╚═══════════════════════════════════════╝
-    """)
-    uvicorn.run("server:app", host="0.0.0.0", port=port, reload=True)
+    threading.Thread(target=lambda: (
+        __import__('time').sleep(1.5),
+        webbrowser.open(f"http://localhost:{port}")
+    ), daemon=True).start()
+    uvicorn.run(app, host="0.0.0.0", port=port)
